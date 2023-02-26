@@ -10,6 +10,26 @@
 
 #include <JuceHeader.h>
 
+enum Slope
+{
+  Slope_12,
+  Slope_24,
+  Slope_36,
+  Slope_48
+};
+
+struct ChainSettings
+{
+    float lowCutFreq{0};
+    float highCutFreq{0};
+    float peakFreq{1.f};
+    int lowCutSlope{Slope::Slope_12};
+    int highCutSlope{Slope::Slope_12};
+    float peakGain{0};
+    float peakQ{0};
+};
+
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts);
 //==============================================================================
 /**
 */
@@ -80,6 +100,11 @@ private:
     
     // create two instances of MonoChain
     MonoChain LeftChain, RightChain;
+    
+    enum ChainPositions
+    {
+        LowCut, Peak, HighCut
+    };
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NVS_EQAudioProcessor)

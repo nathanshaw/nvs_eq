@@ -106,6 +106,10 @@ private:
         LowCut, Peak, HighCut
     };
     
+    void updatePeakFilter(const ChainSettings &chainSettings);
+    void updateHCFilter(const ChainSettings &chainSettings);
+    void updateLCFilter(const ChainSettings &chainSettings);
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NVS_EQAudioProcessor)
 };

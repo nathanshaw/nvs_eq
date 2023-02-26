@@ -108,116 +108,9 @@ void NVS_EQAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock
     // now lets
     auto chainSettings = getChainSettings(apvts);
     
-    auto peakCoefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRate, chainSettings.peakFreq, chainSettings.peakQ, juce::Decibels::decibelsToGain( chainSettings.peakGain));
-
-    /*
-    auto LCFCoefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, chainSettings.lowCutFreq, chainSettings.lowCutSlope);
-    
-    auto HCFCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(sampleRate, chainSettings.highCutFreq, chainSettings.highCutSlope);*/
-    
-    // TODO - pretty sure that this should be done within a GUI-rate function instead of audio-rate...
-    // can this be moved to paint or something instead?
-    *LeftChain.get<ChainPositions::Peak>().coefficients = *peakCoefficients;
-    /*
-    *LeftChain.get<ChainPositions::HighCut>().coefficients = *HCFCoefficients;
-    *LeftChain.get<ChainPositions::LowCut>().coefficients = *LCFCoefficients;*/
-    
-    *RightChain.get<ChainPositions::Peak>().coefficients = *peakCoefficients;
-    /*
-    *RightChain.get<ChainPositions::HighCut>().coefficients = *HCFCoefficients;
-    *RightChain.get<ChainPositions::LowCut>().coefficients = *LCFCoefficients;*/
-    auto cutCoefficients = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.lowCutFreq, sampleRate, (chainSettings.lowCutSlope + 1) * 2);
-    
-    auto& leftLowCut = LeftChain.get<ChainPositions::LowCut>();
-    leftLowCut.setBypassed<0>(true);
-    leftLowCut.setBypassed<1>(true);
-    leftLowCut.setBypassed<2>(true);
-    leftLowCut.setBypassed<3>(true);
-    
-    switch (chainSettings.lowCutSlope) {
-        case Slope_12:
-        {
-            *leftLowCut.get<0>().coefficients = *cutCoefficients[0];
-            leftLowCut.setBypassed<0>(false);
-            break;
-        }
-        case Slope_24:
-        {
-            *leftLowCut.get<0>().coefficients = *cutCoefficients[0];
-            leftLowCut.setBypassed<0>(false);
-            *leftLowCut.get<1>().coefficients = *cutCoefficients[1];
-            leftLowCut.setBypassed<1>(false);
-            break;
-        }
-        case Slope_36:
-        {
-            *leftLowCut.get<0>().coefficients = *cutCoefficients[0];
-            leftLowCut.setBypassed<0>(false);
-            *leftLowCut.get<1>().coefficients = *cutCoefficients[1];
-            leftLowCut.setBypassed<1>(false);
-            *leftLowCut.get<2>().coefficients = *cutCoefficients[2];
-            leftLowCut.setBypassed<2>(false);
-            break;
-        }
-        case Slope_48:
-        {
-            *leftLowCut.get<0>().coefficients = *cutCoefficients[0];
-            leftLowCut.setBypassed<0>(false);
-            *leftLowCut.get<1>().coefficients = *cutCoefficients[1];
-            leftLowCut.setBypassed<1>(false);
-            *leftLowCut.get<2>().coefficients = *cutCoefficients[2];
-            leftLowCut.setBypassed<2>(false);
-            *leftLowCut.get<3>().coefficients = *cutCoefficients[3];
-            leftLowCut.setBypassed<3>(false);
-            break;
-        }
-    }
-    
-    auto& rightLowCut = RightChain.get<ChainPositions::LowCut>();
-    rightLowCut.setBypassed<0>(true);
-    rightLowCut.setBypassed<1>(true);
-    rightLowCut.setBypassed<2>(true);
-    rightLowCut.setBypassed<3>(true);
-    
-    switch (chainSettings.lowCutSlope) {
-        case Slope_12:
-        {
-            *rightLowCut.get<0>().coefficients = *cutCoefficients[0];
-            rightLowCut.setBypassed<0>(false);
-            break;
-        }
-        case Slope_24:
-        {
-            *rightLowCut.get<0>().coefficients = *cutCoefficients[0];
-            rightLowCut.setBypassed<0>(false);
-            *rightLowCut.get<1>().coefficients = *cutCoefficients[1];
-            rightLowCut.setBypassed<1>(false);
-            break;
-        }
-        case Slope_36:
-        {
-            *rightLowCut.get<0>().coefficients = *cutCoefficients[0];
-            rightLowCut.setBypassed<0>(false);
-            *rightLowCut.get<1>().coefficients = *cutCoefficients[1];
-            rightLowCut.setBypassed<1>(false);
-            *rightLowCut.get<2>().coefficients = *cutCoefficients[2];
-            rightLowCut.setBypassed<2>(false);
-            break;
-        }
-        case Slope_48:
-        {
-            *rightLowCut.get<0>().coefficients = *cutCoefficients[0];
-            rightLowCut.setBypassed<0>(false);
-            *rightLowCut.get<1>().coefficients = *cutCoefficients[1];
-            rightLowCut.setBypassed<1>(false);
-            *rightLowCut.get<2>().coefficients = *cutCoefficients[2];
-            rightLowCut.setBypassed<2>(false);
-            *rightLowCut.get<3>().coefficients = *cutCoefficients[3];
-            rightLowCut.setBypassed<3>(false);
-            break;
-        }
-    }
-
+    updatePeakFilter(chainSettings);
+    updateHCFilter(chainSettings);
+    updateLCFilter(chainSettings);
 }
 
 void NVS_EQAudioProcessor::releaseResources()
@@ -269,24 +162,80 @@ void NVS_EQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     
     // now lets
     auto chainSettings = getChainSettings(apvts);
-    auto peakCoefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), chainSettings.peakFreq, chainSettings.peakQ, juce::Decibels::decibelsToGain( chainSettings.peakGain));
     
-    /*
-    auto LCFCoefficients = juce::dsp::IIR::Coefficients<float>::makeLowPass(getSampleRate(), chainSettings.lowCutFreq, chainSettings.lowCutSlope);
-    auto HCFCoefficients = juce::dsp::IIR::Coefficients<float>::makeHighPass(getSampleRate(), chainSettings.highCutFreq, chainSettings.highCutSlope);
-    */
+    updatePeakFilter(chainSettings);
+    updateHCFilter(chainSettings);
+    updateLCFilter(chainSettings);
+    
+    // TODO - what does this code really do? add better notes!
+    // block is initialised with our current audio buffer
+    // create an audio block which can be sent to our processes
+    juce::dsp::AudioBlock<float> block(buffer);
+    
+    auto leftBlock = block.getSingleChannelBlock(0);
+    auto rightBlock = block.getSingleChannelBlock(1);
+
+    juce::dsp::ProcessContextReplacing<float> leftContext(leftBlock);
+    juce::dsp::ProcessContextReplacing<float> rightContext(rightBlock);
+    
+    // now we can pass these contexts to our mono filter chains...
+    LeftChain.process(leftContext);
+    RightChain.process(rightContext);
+    
+}
+
+//==============================================================================
+bool NVS_EQAudioProcessor::hasEditor() const
+{
+    return true; // (change this to false if you choose to not supply an editor)
+}
+
+juce::AudioProcessorEditor* NVS_EQAudioProcessor::createEditor()
+{
+    return new juce::GenericAudioProcessorEditor(*this);
+}
+
+//==============================================================================
+void NVS_EQAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+{
+    // You should use this method to store your parameters in the memory block.
+    // You could do that either as raw data, or use the XML or ValueTree classes
+    // as intermediaries to make it easy to save and load complex data.
+}
+
+void NVS_EQAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+{
+    // You should use this method to restore your parameters from this memory block,
+    // whose contents will have been created by the getStateInformation() call.
+}
+
+ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts)
+{
+    ChainSettings settings;
+    
+    settings.lowCutFreq = apvts.getRawParameterValue("LowCut Freq")->load();
+    settings.highCutFreq = apvts.getRawParameterValue("HighCut Freq")->load();
+    settings.peakFreq = apvts.getRawParameterValue("Peak Freq")->load();
+    settings.lowCutSlope = static_cast<Slope>( apvts.getRawParameterValue("LowCut Slope")->load());
+    settings.highCutSlope = static_cast<Slope>( apvts.getRawParameterValue("HighCut Slope")->load());
+    settings.peakGain = apvts.getRawParameterValue("Peak Gain")->load();
+    settings.peakQ = apvts.getRawParameterValue("Peak Q")->load();
+    
+    return settings;
+}
+
+
+void NVS_EQAudioProcessor::updatePeakFilter(const ChainSettings &chainSettings)
+{
+    auto peakCoefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), chainSettings.peakFreq, chainSettings.peakQ, juce::Decibels::decibelsToGain( chainSettings.peakGain));
     // TODO - pretty sure that this should be done within a GUI-rate function instead of audio-rate...
     // can this be moved to paint or something instead?
     *LeftChain.get<ChainPositions::Peak>().coefficients = *peakCoefficients;
-    /*
-    *LeftChain.get<ChainPositions::HighCut>().coefficients = *HCFCoefficients;
-    *LeftChain.get<ChainPositions::LowCut>().coefficients = *LCFCoefficients;*/
-    
     *RightChain.get<ChainPositions::Peak>().coefficients = *peakCoefficients;
-    /*
-    *RightChain.get<ChainPositions::HighCut>().coefficients = *HCFCoefficients;
-    *RightChain.get<ChainPositions::LowCut>().coefficients = *LCFCoefficients;*/
-    
+}
+
+void NVS_EQAudioProcessor::updateLCFilter(const ChainSettings &chainSettings)
+{
     auto cutCoefficients = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.lowCutFreq, getSampleRate(), (chainSettings.lowCutSlope + 1) * 2);
     
     auto& leftLowCut = LeftChain.get<ChainPositions::LowCut>();
@@ -378,67 +327,12 @@ void NVS_EQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
             break;
         }
     }
-
-
-    
-    // TODO - what does this code really do? add better notes!
-    // block is initialised with our current audio buffer
-    // create an audio block which can be sent to our processes
-    juce::dsp::AudioBlock<float> block(buffer);
-    
-    auto leftBlock = block.getSingleChannelBlock(0);
-    auto rightBlock = block.getSingleChannelBlock(1);
-
-    juce::dsp::ProcessContextReplacing<float> leftContext(leftBlock);
-    juce::dsp::ProcessContextReplacing<float> rightContext(rightBlock);
-    
-    // now we can pass these contexts to our mono filter chains...
-    LeftChain.process(leftContext);
-    RightChain.process(rightContext);
-    
-    
 }
 
-//==============================================================================
-bool NVS_EQAudioProcessor::hasEditor() const
+void NVS_EQAudioProcessor::updateHCFilter(const ChainSettings &chainSettings)
 {
-    return true; // (change this to false if you choose to not supply an editor)
+    // TODO
 }
-
-juce::AudioProcessorEditor* NVS_EQAudioProcessor::createEditor()
-{
-    return new juce::GenericAudioProcessorEditor(*this);
-}
-
-//==============================================================================
-void NVS_EQAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
-{
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
-}
-
-void NVS_EQAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
-{
-    // You should use this method to restore your parameters from this memory block,
-    // whose contents will have been created by the getStateInformation() call.
-}
-
-ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts)
-{
-    ChainSettings settings;
-    
-    settings.lowCutFreq = apvts.getRawParameterValue("LowCut Freq")->load();
-    settings.highCutFreq = apvts.getRawParameterValue("HighCut Freq")->load();
-    settings.peakFreq = apvts.getRawParameterValue("Peak Freq")->load();
-    settings.lowCutSlope = static_cast<Slope>( apvts.getRawParameterValue("LowCut Slope")->load());
-    settings.highCutSlope = static_cast<Slope>( apvts.getRawParameterValue("HighCut Slope")->load());
-    settings.peakGain = apvts.getRawParameterValue("Peak Gain")->load();
-    settings.peakQ = apvts.getRawParameterValue("Peak Q")->load();
-    
-    return settings;
-}
-
 
 juce::AudioProcessorValueTreeState::ParameterLayout
     NVS_EQAudioProcessor::createParameterLayout()

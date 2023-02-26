@@ -62,12 +62,25 @@ public:
     // this function syncing the values of GUI objects and variables within the plugin
     static juce::AudioProcessorValueTreeState::ParameterLayout
         createParameterLayout();
+    
     // this can be static as it does not use any member variables
     juce::AudioProcessorValueTreeState apvts {*this, nullptr, "Parameters",
         createParameterLayout()};
 
     
 private:
+    // create an alies for this datatype that is more human-readable
+    using Filter = juce::dsp::IIR::Filter<float>;
+    
+    // need 4x of these filters in a processing chain for the low-pass filter, high-pass filter, and other parameters for our EQ
+    using QuadFilterProcessingChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
+    
+    // we need to create a chain for each channel of audio =)
+    using MonoChain = juce::dsp::ProcessorChain<QuadFilterProcessingChain, Filter, QuadFilterProcessingChain>;
+    
+    // create two instances of MonoChain
+    MonoChain LeftChain, RightChain;
+    
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NVS_EQAudioProcessor)
 };

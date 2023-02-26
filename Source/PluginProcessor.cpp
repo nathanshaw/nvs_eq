@@ -166,7 +166,7 @@ bool NVS_EQAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* NVS_EQAudioProcessor::createEditor()
 {
-    return new NVS_EQAudioProcessorEditor (*this);
+    return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -183,9 +183,50 @@ void NVS_EQAudioProcessor::setStateInformation (const void* data, int sizeInByte
     // whose contents will have been created by the getStateInformation() call.
 }
 
+juce::AudioProcessorValueTreeState::ParameterLayout
+    NVS_EQAudioProcessor::createParameterLayout()
+{
+        juce::AudioProcessorValueTreeState::ParameterLayout layout;
+        
+        // frequency for the EQ
+        layout.add(std::make_unique<juce::AudioParameterFloat>("LowCut Freq", "LowCut Freq",
+             juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f), 20.f));
+        
+        layout.add(std::make_unique<juce::AudioParameterFloat>("HighCut Freq", "HighCut Freq", juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f), 20000.f));
+        
+        layout.add(std::make_unique<juce::AudioParameterFloat>("Peak Freq", "Peak Freq", juce::NormalisableRange<float>(20.f, 20000.f, 1.f, 1.f), 1000.f));
+        
+        // gain amount for the EQ
+        
+        // string array for the low and highcut EQ options
+        
+        juce::StringArray stringArray;
+        for (int i = 0; i < 4; ++i)
+        {
+            juce::String str;
+            str << (12 + i * 12);
+            str << "db/Oct";
+            stringArray.add(str);
+        }
+        
+        layout.add(std::make_unique<juce::AudioParameterChoice>("LowCut Slope", "LowCut Slope", stringArray, 0));
+
+        layout.add(std::make_unique<juce::AudioParameterChoice>("HighCut Slope", "HighCut Slope", stringArray, 0));
+        
+        // gain amount for the EQ
+        layout.add(std::make_unique<juce::AudioParameterFloat>("Peak Gain", "Peak Gain", juce::NormalisableRange<float>(-24.f, 24.f, 0.5f, 1.f), 0.f));
+        
+        // gain amount for the EQ
+        layout.add(std::make_unique<juce::AudioParameterFloat>("Peak Q", "Peak Q", juce::NormalisableRange<float>(0.1f, 10.f, 0.005f, 1.f), 0.7f));
+        
+        return layout;
+    }
+
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
     return new NVS_EQAudioProcessor();
 }
+
+

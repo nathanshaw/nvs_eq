@@ -20,6 +20,31 @@ struct CustomRotarySlider : juce::Slider
     }
 };
 
+
+struct ResponseCurveComponent: juce::Component,
+    juce::AudioProcessorParameter::Listener,
+    juce::Timer
+{
+    
+        ResponseCurveComponent(NVS_EQAudioProcessor&);
+        ~ResponseCurveComponent();
+       
+        void parameterValueChanged (int parameterIndex, float newValue) override;
+        // we dont care about gestures, so we can leave this function blank
+        void parameterGestureChanged (int parameterIndex, bool gestureIsStarting) override { };
+
+        void timerCallback() override;
+        
+        void paint(juce::Graphics&) override;
+        
+    private:
+        NVS_EQAudioProcessor& audioProcessor;
+        // need an atomic flag to do something ? TODO
+        juce::Atomic<bool> parametersChanged { false };
+        
+        MonoChain monoChain;
+};
+
 //==============================================================================
 /**
 */
@@ -33,7 +58,9 @@ public:
     void paint (juce::Graphics&) override;
     void resized() override;
 
+    
 private:
+    
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     NVS_EQAudioProcessor& audioProcessor;
@@ -42,6 +69,8 @@ private:
     
     using APVTS = juce::AudioProcessorValueTreeState;
     using Attachment = APVTS::SliderAttachment;
+    
+    ResponseCurveComponent responseCurveComponent;
     
     Attachment peakFreqSliderAttachment, peakGainSliderAttachment, peakQualitySliderAttachment, lowCutFreqSliderAttachment, highCutFreqSliderAttachment, lowCutSlopeSliderAttachment, highCutSlopeSliderAttachment;
     

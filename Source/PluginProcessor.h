@@ -30,6 +30,70 @@ struct ChainSettings
 };
 
 ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts);
+
+// create an alies for this datatype that is more human-readable
+using Filter = juce::dsp::IIR::Filter<float>;
+
+// need 4x of these filters in a processing chain for the low-pass filter, high-pass filter, and other parameters for our EQ
+using QuadFilterProcessingChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
+
+// we need to create a chain for each channel of audio =)
+using MonoChain = juce::dsp::ProcessorChain<QuadFilterProcessingChain, Filter, QuadFilterProcessingChain>;
+
+enum ChainPositions
+{
+    LowCut, Peak, HighCut
+};
+
+using Coefficients = Filter::CoefficientsPtr;
+
+void updateCoefficients(Coefficients &old, const Coefficients &replacement);
+
+Coefficients makePeakFilter(const ChainSettings& chainSettings, double sampleRate);
+
+inline auto makeLowCutFilter(const ChainSettings& chainSettings, double sampleRate)
+{
+    return juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.lowCutFreq, sampleRate, (chainSettings.lowCutSlope + 1) * 2);
+}
+
+inline auto makeHighCutFilter(const ChainSettings& chainSettings, double sampleRate)
+{
+    return juce::dsp::FilterDesign<float>::designIIRLowpassHighOrderButterworthMethod(chainSettings.highCutFreq, sampleRate, (chainSettings.highCutSlope + 1) * 2);
+}
+
+template <typename ChainType, typename CoefficientType>
+void updateCutFilter(ChainType &leftLowCut, const CoefficientType &cutCoefficients, const Slope &lowCutSlope) {
+    leftLowCut.template setBypassed<0>(true);
+    leftLowCut.template setBypassed<1>(true);
+    leftLowCut.template setBypassed<2>(true);
+    leftLowCut.template setBypassed<3>(true);
+
+    switch (lowCutSlope) {
+        case Slope_48:
+        {
+            *leftLowCut.template get<3>().coefficients = *cutCoefficients[3];
+            leftLowCut.template setBypassed<3>(false);
+        }
+        case Slope_36:
+        {
+            *leftLowCut.template get<2>().coefficients = *cutCoefficients[2];
+            leftLowCut.template setBypassed<2>(false);
+        }
+        case Slope_24:
+        {
+            *leftLowCut.template get<1>().coefficients = *cutCoefficients[1];
+            leftLowCut.template setBypassed<1>(false);
+            break;
+        }
+        case Slope_12:
+        {
+            *leftLowCut.template get<0>().coefficients = *cutCoefficients[0];
+            leftLowCut.template setBypassed<0>(false);
+            break;
+        }
+    }
+}
+
 //==============================================================================
 /**
 */
@@ -86,67 +150,15 @@ public:
     // this can be static as it does not use any member variables
     juce::AudioProcessorValueTreeState apvts {*this, nullptr, "Parameters",
         createParameterLayout()};
-
     
 private:
-    // create an alies for this datatype that is more human-readable
-    using Filter = juce::dsp::IIR::Filter<float>;
-    
-    // need 4x of these filters in a processing chain for the low-pass filter, high-pass filter, and other parameters for our EQ
-    using QuadFilterProcessingChain = juce::dsp::ProcessorChain<Filter, Filter, Filter, Filter>;
-    
-    // we need to create a chain for each channel of audio =)
-    using MonoChain = juce::dsp::ProcessorChain<QuadFilterProcessingChain, Filter, QuadFilterProcessingChain>;
-    
     // create two instances of MonoChain
     MonoChain LeftChain, RightChain;
-    
-    enum ChainPositions
-    {
-        LowCut, Peak, HighCut
-    };
     
     void updatePeakFilter(const ChainSettings &chainSettings);
     void updateLowCutFilter(const ChainSettings &chainSettings);
     void updateHighCutFilter(const ChainSettings &chainSettings);
     void updateFilters();
-    
-    using Coefficients = Filter::CoefficientsPtr;
-    
-    static void updateCoefficients(Coefficients &old, const Coefficients &replacement);
-    
-    template <typename ChainType, typename CoefficientType>
-    void updateCutFilter(ChainType &leftLowCut, const CoefficientType &cutCoefficients, const Slope &lowCutSlope) {
-        leftLowCut.template setBypassed<0>(true);
-        leftLowCut.template setBypassed<1>(true);
-        leftLowCut.template setBypassed<2>(true);
-        leftLowCut.template setBypassed<3>(true);
-
-        switch (lowCutSlope) {
-            case Slope_48:
-            {
-                *leftLowCut.template get<3>().coefficients = *cutCoefficients[3];
-                leftLowCut.template setBypassed<3>(false);
-            }
-            case Slope_36:
-            {
-                *leftLowCut.template get<2>().coefficients = *cutCoefficients[2];
-                leftLowCut.template setBypassed<2>(false);
-            }
-            case Slope_24:
-            {
-                *leftLowCut.template get<1>().coefficients = *cutCoefficients[1];
-                leftLowCut.template setBypassed<1>(false);
-                break;
-            }
-            case Slope_12:
-            {
-                *leftLowCut.template get<0>().coefficients = *cutCoefficients[0];
-                leftLowCut.template setBypassed<0>(false);
-                break;
-            }
-        }
-    }
     
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (NVS_EQAudioProcessor)

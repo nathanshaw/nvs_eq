@@ -149,7 +149,7 @@ bool NVS_EQAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) c
 
 void NVS_EQAudioProcessor::updateLowCutFilter(const ChainSettings &chainSettings)
 {
-    auto lowCutCoefficients = juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.lowCutFreq, getSampleRate(), (chainSettings.lowCutSlope + 1) * 2);
+    auto lowCutCoefficients = makeLowCutFilter(chainSettings, getSampleRate());
     
     auto& leftLowCut = LeftChain.get<ChainPositions::LowCut>();
     auto& rightLowCut = RightChain.get<ChainPositions::LowCut>();
@@ -160,7 +160,7 @@ void NVS_EQAudioProcessor::updateLowCutFilter(const ChainSettings &chainSettings
 
 void NVS_EQAudioProcessor::updateHighCutFilter(const ChainSettings &chainSettings)
 {
-    auto highCutCoefficients = juce::dsp::FilterDesign<float>::designIIRLowpassHighOrderButterworthMethod(chainSettings.highCutFreq, getSampleRate(), (chainSettings.highCutSlope + 1) * 2);
+    auto highCutCoefficients = makeHighCutFilter(chainSettings, getSampleRate());
     
     auto& leftHighCut = LeftChain.get<ChainPositions::HighCut>();
     auto& rightHighCut = RightChain.get<ChainPositions::HighCut>();
@@ -204,8 +204,6 @@ void NVS_EQAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce:
     RightChain.process(rightContext);
 }
 
-
-
 //==============================================================================
 bool NVS_EQAudioProcessor::hasEditor() const
 {
@@ -231,6 +229,8 @@ void NVS_EQAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
     // All of our current parameters are stored in the apvts object so all we have to do is
     // write that data to the stream we just connected
     apvts.state.writeToStream(mos);
+    
+    // TODO also need to update the editor...
     
 }
 
@@ -262,18 +262,23 @@ ChainSettings getChainSettings(juce::AudioProcessorValueTreeState& apvts)
     return settings;
 }
 
+void updateCoefficients(Coefficients &old, const Coefficients &replacement)
+{
+    *old = *replacement;
+}
+
+Coefficients makePeakFilter(const ChainSettings& chainSettings, double sampleRate)
+{
+    return juce::dsp::IIR::Coefficients<float>::makePeakFilter(sampleRate, chainSettings.peakFreq, chainSettings.peakQ, juce::Decibels::decibelsToGain( chainSettings.peakGain));
+}
+
 void NVS_EQAudioProcessor::updatePeakFilter(const ChainSettings &chainSettings)
 {
-    auto peakCoefficients = juce::dsp::IIR::Coefficients<float>::makePeakFilter(getSampleRate(), chainSettings.peakFreq, chainSettings.peakQ, juce::Decibels::decibelsToGain( chainSettings.peakGain));
+    auto peakCoefficients = makePeakFilter(chainSettings, getSampleRate());
     // TODO - pretty sure that this should be done within a GUI-rate function instead of audio-rate...
     // can this be moved to paint or something instead?
     updateCoefficients(LeftChain.get<ChainPositions::Peak>().coefficients, peakCoefficients);
     updateCoefficients(RightChain.get<ChainPositions::Peak>().coefficients, peakCoefficients);
-}
-
-void NVS_EQAudioProcessor::updateCoefficients(Coefficients &old, const Coefficients &replacement)
-{
-    *old = *replacement;
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout
